@@ -1,0 +1,31 @@
+<table>
+<tr>
+  <th style="text-align: center; vertical-align: middle;">Name</th>
+  <th style="text-align: center; vertical-align: middle;">Bild</th>
+  <th style="text-align: center; vertical-align: middle;">Download</th>
+  <th style="text-align: center; vertical-align: middle;">Löschen</th>
+</tr>
+
+{{#each files}}
+<tr>
+<td>
+{{this}}
+</td>
+<td style="text-align: center; vertical-align: middle;">
+<img src="/data/{{this}}" alt="" width=50% >
+</td>
+<td style="text-align: center; vertical-align: middle;">
+<form class="" action="/download" method="post">
+  <input type="text" name="target" value="{{this}}" hidden=true>
+  <button class="btn" type="submit" name="button" annotation="Download"><i class="fas fa-save"></i></button>
+</form>
+</td>
+<td style="text-align: center; vertical-align: middle;">
+<form class="" action="/delete" method="post">
+  <input type="text" name="target" value="{{this}}" hidden=true>
+  <button class="btn"  type="submit" name="button" annotation="Löschen"><i class="fas fa-trash-alt"></i></button>
+</form>
+</td>
+</tr>
+{{/each}}
+</table>
