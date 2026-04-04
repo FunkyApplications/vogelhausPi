@@ -71,11 +71,11 @@ app.use(function(req, res, next) {
 })
 
 // CRONJOB für Täglich neues Foto
-const dailyPicCron = new CronJob('0 * 11 * * *', function(req, res, next) {
+const dailyPicCron = new CronJob('0 11 * * *', function(req, res, next) {
   const d = new Date()
   var todayDate = d.toISOString().slice(0, 10);
   const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-  const command = `raspistill -o ~/share/vogelhausPi/data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
+  const command = `raspistill -o ~/Projects/vogelhausPi/data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
   console.log(`Foto am ${todayDate}_${time} automatisch erstellt`);
   exec(command, (error, stdout, stderr) => {
     if (error) {

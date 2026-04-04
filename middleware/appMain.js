@@ -11,7 +11,7 @@ processMain = (app) => {
     const d = new Date()
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-    const command = `raspistill -o /data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
+    const command = `raspistill -o ~/Projects/vogelhausPi/data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
     exec(command, (error, stdout, stderr) => {
       if (error) {
         console.log(`error: ${error.message}`);
@@ -48,7 +48,7 @@ processMain = (app) => {
   app.get('/Galerie', function(req, res) {
     const files = fs.readdirSync('data')
 
-    res.locals.files = files
+    res.locals.files =(files||[]).reverse()
 
     res.render('Galerie')
   })
@@ -68,7 +68,9 @@ processMain = (app) => {
       const { target } = req.body
       const filepath = './data/' + target
       fs.unlink(filepath, (err) => {
-        if (err) throw err;
+        if (err) {
+	 console.log('Löschen nicht erfolgreich!')
+	};
         console.log('Datei wurde gelöscht');
       })
     }
