@@ -29,6 +29,21 @@ app.engine('hbs', hbs.engine({
     },
     prettifyDate: function(timestamp) {
       return new Date(Number(timestamp)).toLocaleString()
+    },
+    humanFileSize: function(bytes) {
+      if (bytes === 0) return '0 B'
+      const thresh = 1024
+      if (Math.abs(bytes) < thresh) return bytes + ' B'
+      const units = ['KB', 'MB', 'GB', 'TB']
+      let u = -1
+      do {
+        bytes /= thresh
+        ++u
+      } while (Math.abs(bytes) >= thresh && u < units.length - 1)
+      return bytes.toFixed(1) + ' ' + units[u]
+    },
+    realIndex: function(index) {
+      return index + 1
     }
   }
 }));
@@ -45,6 +60,12 @@ app.use('/materializeInit/js', express.static('static/js'));
 app.use('/static/css', express.static('static/css'));
 app.use('/data/', express.static('data/'));
 
+// Ensure data directory exists
+const dataDir = path.join(__dirname, 'data');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  console.log('Dateiverzeichnis erstellt.');
+}
 
 app.use(function(req, res, next) {
   const files = fs.readdirSync('data')
@@ -65,7 +86,7 @@ app.use(function(req, res, next) {
     });
 
     res.locals.top10pictures = res.locals.pictures.reverse().slice(0, Math.min(res.locals.pictures.length, 8))
-    res.locals.top10videos = res.locals.videos.reverse().slice(0, Math.min(res.locals.pictures.length, 8))
+    res.locals.top10videos = res.locals.videos.reverse().slice(0, Math.min(res.locals.videos.length, 8))
   }
   next()
 })

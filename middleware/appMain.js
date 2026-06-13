@@ -1,7 +1,48 @@
 const fs = require('fs')
+const path = require('path')
 const { exec } = require("child_process");
 
+const humanFileSize = function(bytes) {
+  if (bytes === 0) return '0 B'
+  const thresh = 1024
+  if (Math.abs(bytes) < thresh) return bytes + ' B'
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let u = -1
+  do {
+    bytes /= thresh
+    ++u
+  } while (Math.abs(bytes) >= thresh && u < units.length - 1)
+  return bytes.toFixed(1) + ' ' + units[u]
+}
+
+const prettifyDate = function(timestamp) {
+  return new Date(Number(timestamp)).toLocaleString()
+}
+
 processMain = (app) => {
+  const galleryPageSize = 20
+
+  const buildGalleryItems = (filesRaw) => {
+    return (filesRaw || [])
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
+      .map((file) => {
+        const filepath = path.join('data', file)
+        const stats = fs.statSync(filepath)
+        const ext = path.extname(file).slice(1).toLowerCase()
+        const type = ext === 'png' ? 'image' : ext === 'h264' ? 'video' : 'other'
+
+        return {
+          name: file,
+          type: type,
+          isImage: type === 'image',
+          isVideo: type === 'video',
+          size: stats.size,
+          mtime: stats.mtimeMs,
+          sizeText: humanFileSize(stats.size),
+          dateText: prettifyDate(stats.mtimeMs),
+        }
+      })
+  }
 
   app.get('/', function(req, res) {
     res.render('Start')
@@ -30,15 +71,14 @@ processMain = (app) => {
     const d = new Date()
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-    const command = "raspivid -o /data/${todayDate}_${time}.h264 -t 50000 -w 640 -h 480"
+    const outputFile = path.join(__dirname, '..', 'data', `${todayDate}_${time}.h264`)
+    const command = `raspivid -o ${outputFile} -t 10000 -w 640 -h 480`
     exec(command, (error, stdout, stderr) => {
       if (error) {
         console.log(`error: ${error.message}`);
-        return;
       }
       if (stderr) {
         console.log(`stderr: ${stderr}`);
-        return;
       }
       console.log(`stdout: ${stdout}`);
       res.redirect("/")
@@ -46,11 +86,57 @@ processMain = (app) => {
   })
 
   app.get('/Galerie', function(req, res) {
-    const files = fs.readdirSync('data')
+    let files = []
+    const dataDir = path.join(__dirname, '..', 'data')
+    if (fs.existsSync(dataDir)) {
+      const filesRaw = fs.readdirSync(dataDir)
+      files = buildGalleryItems(filesRaw)
+    }
 
-    res.locals.files =(files||[]).reverse()
+    res.locals.files = files.slice(0, galleryPageSize)
+    res.locals.moreFiles = files.length > galleryPageSize
+    res.locals.galleryCount = files.length
+    res.locals.maxGalleryItems = galleryPageSize
 
     res.render('Galerie')
+  })
+
+  app.get('/Galerie/load', function(req, res) {
+    let files = []
+    const dataDir = path.join(__dirname, '..', 'data')
+    if (fs.existsSync(dataDir)) {
+      const filesRaw = fs.readdirSync(dataDir)
+      files = buildGalleryItems(filesRaw)
+    }
+    const offset = parseInt(req.query.offset, 10) || 0
+    const nextItems = files.slice(offset, offset + galleryPageSize)
+    res.json({
+      files: nextItems,
+      hasMore: offset + galleryPageSize < files.length,
+      nextOffset: offset + nextItems.length,
+    })
+  })
+
+  app.get('/image/:target', function(req, res) {
+    const target = path.basename(req.params.target)
+    const filepath = path.join(__dirname, '..', 'data', target)
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).send('Datei nicht gefunden.')
+    }
+
+    const ext = path.extname(target).slice(1).toLowerCase()
+    if (ext !== 'png') {
+      return res.status(404).send('Nur Bilddateien können angezeigt werden.')
+    }
+
+    const stats = fs.statSync(filepath)
+    res.render('Image', {
+      file: target,
+      size: stats.size,
+      mtime: stats.mtimeMs,
+      type: 'Bild',
+    })
   })
 
   app.post('/download', function(req, res) {

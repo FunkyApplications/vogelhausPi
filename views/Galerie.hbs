@@ -1,31 +1,131 @@
-<table>
+<h4>Galerie</h4>
+{{#if moreFiles}}
+<p>Nur die ersten {{maxGalleryItems}} Dateien werden direkt geladen, weitere Dateien erscheinen beim Scrollen nach unten. Insgesamt sind {{galleryCount}} Dateien vorhanden.</p>
+{{/if}}
+<table id="gallery-table">
 <tr>
+  <th style="text-align: center; vertical-align: middle;">#</th>
   <th style="text-align: center; vertical-align: middle;">Name</th>
-  <th style="text-align: center; vertical-align: middle;">Bild</th>
+  <th style="text-align: center; vertical-align: middle;">Vorschau</th>
+  <th style="text-align: center; vertical-align: middle;">Größe</th>
+  <th style="text-align: center; vertical-align: middle;">Datum</th>
   <th style="text-align: center; vertical-align: middle;">Download</th>
   <th style="text-align: center; vertical-align: middle;">Löschen</th>
 </tr>
 
 {{#each files}}
 <tr>
-<td>
-{{this}}
-</td>
+<td>{{realIndex @index}}</td>
 <td style="text-align: center; vertical-align: middle;">
-<img src="/data/{{this}}" alt="" width=50% >
+  {{#if isImage}}
+    <a href="/image/{{name}}">
+      <img src="/data/{{name}}" alt="{{name}}" width="120" loading="lazy">
+    </a>
+  {{else}}
+    {{#if isVideo}}
+      <a href="/data/{{name}}" target="_blank">
+        <i class="fas fa-video fa-2x"></i>
+      </a>
+    {{else}}
+      <span>{{name}}</span>
+    {{/if}}
+  {{/if}}
 </td>
+<td>{{humanFileSize size}}</td>
+<td>{{prettifyDate mtime}}</td>
 <td style="text-align: center; vertical-align: middle;">
-<form class="" action="/download" method="post">
-  <input type="text" name="target" value="{{this}}" hidden=true>
+<form action="/download" method="post">
+  <input type="text" name="target" value="{{name}}" hidden=true>
   <button class="btn" type="submit" name="button" annotation="Download"><i class="fas fa-save"></i></button>
 </form>
 </td>
 <td style="text-align: center; vertical-align: middle;">
-<form class="" action="/delete" method="post">
-  <input type="text" name="target" value="{{this}}" hidden=true>
+<form action="/delete" method="post">
+  <input type="text" name="target" value="{{name}}" hidden=true>
   <button class="btn"  type="submit" name="button" annotation="Löschen"><i class="fas fa-trash-alt"></i></button>
 </form>
 </td>
 </tr>
 {{/each}}
 </table>
+<div id="gallery-loader" style="text-align:center; padding: 1rem; display: none;">Lade mehr Bilder…</div>
+<div id="gallery-end" style="text-align:center; padding: 1rem; display: none;">Keine weiteren Dateien.</div>
+<script>
+  (function() {
+    const loader = document.getElementById('gallery-loader')
+    const end = document.getElementById('gallery-end')
+    const table = document.getElementById('gallery-table')
+    let offset = {{files.length}}
+    let loading = false
+    let hasMore = {{#if moreFiles}}true{{else}}false{{/if}}
+
+    const renderRow = (file) => {
+      const tr = document.createElement('tr')
+      tr.innerHTML = `
+        <td style="text-align: center; vertical-align: middle;">${offset + 1}</td>
+        <td style="text-align: center; vertical-align: middle;">
+          ${file.isImage ?
+            `<a href="/image/${file.name}"><img src="/data/${file.name}" alt="${file.name}" width="120" loading="lazy"></a>` :
+            file.isVideo ? `<a href="/data/${file.name}" target="_blank"><i class="fas fa-video fa-2x"></i></a>` :
+            `<span>${file.name}</span>`
+          }
+        </td>
+        <td>${file.sizeText || file.size}</td>
+        <td>${file.dateText || file.mtime}</td>
+        <td style="text-align: center; vertical-align: middle;">
+          <form action="/download" method="post">
+            <input type="text" name="target" value="${file.name}" hidden=true>
+            <button class="btn" type="submit" name="button" annotation="Download"><i class="fas fa-save"></i></button>
+          </form>
+        </td>
+        <td style="text-align: center; vertical-align: middle;">
+          <form action="/delete" method="post">
+            <input type="text" name="target" value="${file.name}" hidden=true>
+            <button class="btn" type="submit" name="button" annotation="Löschen"><i class="fas fa-trash-alt"></i></button>
+          </form>
+        </td>
+      `
+      return tr
+    }
+
+    const appendFiles = (items) => {
+      items.forEach(item => {
+        const row = renderRow(item)
+        table.appendChild(row)
+      })
+    }
+
+    const loadMore = async () => {
+      if (!hasMore || loading) return
+      loading = true
+      loader.style.display = 'block'
+      try {
+        const response = await fetch(`/Galerie/load?offset=${offset}`)
+        if (!response.ok) throw new Error('Fehler beim Laden')
+        const data = await response.json()
+        if (data.files && data.files.length) {
+          appendFiles(data.files)
+          offset = data.nextOffset
+          hasMore = data.hasMore
+        } else {
+          hasMore = false
+        }
+        if (!hasMore) {
+          end.style.display = 'block'
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        loader.style.display = 'none'
+        loading = false
+      }
+    }
+
+    window.addEventListener('scroll', () => {
+      if (!hasMore || loading) return
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 200) {
+        loadMore()
+      }
+    })
+  })()
+</script>
