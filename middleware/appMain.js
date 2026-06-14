@@ -139,7 +139,23 @@ processMain = (app) => {
     return names
   }
 
+  // Get latest image or video for preview
+  const getLatestMedia = () => {
+    const names = getCachedGalleryItems()
+    if (!names.length) return null
+    
+    for (const name of names) {
+      const ext = path.extname(name).slice(1).toLowerCase()
+      if (ext === 'png' || ext === 'mp4') {
+        return { name, ext }
+      }
+    }
+    return null
+  }
+
   app.get('/', function(req, res) {
+    const latest = getLatestMedia()
+    res.locals.latestMedia = latest
     res.render('Start')
   })
 

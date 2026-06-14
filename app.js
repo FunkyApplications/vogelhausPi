@@ -44,6 +44,9 @@ app.engine('hbs', hbs.engine({
     },
     realIndex: function(index) {
       return index + 1
+    },
+    eq: function(a, b) {
+      return a === b
     }
   }
 }));

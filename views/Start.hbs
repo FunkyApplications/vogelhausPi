@@ -1,5 +1,27 @@
 
 
+      <!--   Latest Media Preview   -->
+      {{#if latestMedia}}
+      <div class="row">
+        <div class="col s12">
+          <div class="card">
+            <div class="card-content center">
+              <span class="card-title">Letztes Bild/Video</span>
+              {{#if (eq latestMedia.ext "png")}}
+                <img src="/data/{{latestMedia.name}}" alt="Latest" style="max-width: 100%; max-height: 300px; border-radius: 4px;">
+              {{else}}
+                <video width="100%" height="300" style="border-radius: 4px;" controls>
+                  <source src="/data/{{latestMedia.name}}" type="video/mp4">
+                  Ihr Browser unterstützt HTML5 Video nicht.
+                </video>
+              {{/if}}
+              <p class="grey-text text-darken-2">{{latestMedia.name}}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
       <!--   Icon Section   -->
       <div class="row">
         <div class="col s12 m4">
