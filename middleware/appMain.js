@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { exec, execFile } = require('child_process')
 const ffmpeg = require('fluent-ffmpeg')
 const packageJson = require('../package.json');
 
@@ -169,7 +170,6 @@ processMain = (app) => {
     const mp4File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.mp4`)
     
     // Record as h264
-    const { execFile } = require('child_process')
     const raspividArgs = ['-o', h264File, '-t', '10000', '-w', '640', '-h', '480']
     
     execFile('raspivid', raspividArgs, (error) => {
