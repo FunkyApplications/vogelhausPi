@@ -10,7 +10,8 @@ var path = require('path');
 var bodyParser = require('body-parser');
 const uuid = require('uuid').v1;
 var CronJob = require('cron').CronJob;
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
+const { loadSettings, buildRaspistillArgs, IMAGE_EXTENSIONS } = require('./config/settings');
 
 var app = express();
 app.use(cookieParser())
@@ -80,7 +81,7 @@ app.use(function(req, res, next) {
 
     files.forEach((file, i) => {
       const fileType = file.split('.').pop().toLowerCase()
-      if (fileType == 'png') {
+      if (IMAGE_EXTENSIONS.includes(fileType)) {
         res.locals.pictures.push(file)
       }
       if (fileType == 'mp4' || fileType == 'h264') {
@@ -96,12 +97,14 @@ app.use(function(req, res, next) {
 
 // CRONJOB für Täglich neues Foto
 const dailyPicCron = new CronJob('0 11 * * *', function(req, res, next) {
+  const settings = loadSettings()
   const d = new Date()
   var todayDate = d.toISOString().slice(0, 10);
   const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-  const command = `raspistill -o ~/Projects/vogelhausPi/data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
+  const outputFile = path.join(__dirname, 'data', `${todayDate}_${time}.${settings.photo.format}`)
+  const raspistillArgs = buildRaspistillArgs(settings, outputFile)
   console.log(`Foto am ${todayDate}_${time} automatisch erstellt`);
-  exec(command, (error, stdout, stderr) => {
+  execFile('raspistill', raspistillArgs, (error, stdout, stderr) => {
     if (error) {
       console.log(`error: ${error.message}`);
       return;

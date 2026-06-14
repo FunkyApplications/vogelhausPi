@@ -1,0 +1,182 @@
+<h4>Einstellungen</h4>
+<p class="light">Hier können die Kamera-Einstellungen für Fotos und Videos angepasst werden. Die "Empfehlung" basiert auf der NoIR Camera v2 an einem Raspberry Pi Zero WH.</p>
+
+{{#if saved}}
+<div class="card-panel green lighten-4">Einstellungen wurden gespeichert.</div>
+{{/if}}
+
+<div class="row" style="margin-bottom: 0;">
+  <button id="btn-recommended" class="btn waves-effect waves-light" type="button">Empfohlene Werte übernehmen</button>
+  <button id="btn-defaults" class="btn-flat waves-effect" type="button">Auf Standard zurücksetzen</button>
+</div>
+
+<form action="/Einstellungen" method="post">
+
+  <h5>Foto</h5>
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">Auflösung</label>
+      <select name="photo.resolution" class="browser-default">
+        <option value="1024x768" {{#if (eq settings.photo.resolution "1024x768")}}selected{{/if}}>1024 x 768</option>
+        <option value="1640x1232" {{#if (eq settings.photo.resolution "1640x1232")}}selected{{/if}}>1640 x 1232</option>
+        <option value="2592x1944" {{#if (eq settings.photo.resolution "2592x1944")}}selected{{/if}}>2592 x 1944</option>
+        <option value="3280x2464" {{#if (eq settings.photo.resolution "3280x2464")}}selected{{/if}}>3280 x 2464 (volle Auflösung)</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.resolution}}</span>
+    </div>
+
+    <div class="input-field col s12 m6">
+      <label class="active">Dateiformat</label>
+      <select name="photo.format" class="browser-default">
+        <option value="png" {{#if (eq settings.photo.format "png")}}selected{{/if}}>PNG (verlustfrei, langsamer)</option>
+        <option value="jpg" {{#if (eq settings.photo.format "jpg")}}selected{{/if}}>JPEG (schneller, kleinere Dateien)</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.format}}</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">ISO</label>
+      <select name="photo.iso" class="browser-default">
+        <option value="0" {{#if (eq settings.photo.iso 0)}}selected{{/if}}>Automatisch (0)</option>
+        <option value="100" {{#if (eq settings.photo.iso 100)}}selected{{/if}}>100</option>
+        <option value="200" {{#if (eq settings.photo.iso 200)}}selected{{/if}}>200</option>
+        <option value="400" {{#if (eq settings.photo.iso 400)}}selected{{/if}}>400</option>
+        <option value="800" {{#if (eq settings.photo.iso 800)}}selected{{/if}}>800</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.iso}}</span>
+    </div>
+
+    <div class="input-field col s12 m6">
+      <label class="active">Belichtungsmodus (-ex)</label>
+      <select name="photo.exposureMode" class="browser-default">
+        <option value="auto" {{#if (eq settings.photo.exposureMode "auto")}}selected{{/if}}>Automatisch</option>
+        <option value="sports" {{#if (eq settings.photo.exposureMode "sports")}}selected{{/if}}>Sport (kurze Verschlusszeit)</option>
+        <option value="night" {{#if (eq settings.photo.exposureMode "night")}}selected{{/if}}>Nacht</option>
+        <option value="backlight" {{#if (eq settings.photo.exposureMode "backlight")}}selected{{/if}}>Gegenlicht</option>
+        <option value="verylong" {{#if (eq settings.photo.exposureMode "verylong")}}selected{{/if}}>Sehr lange Belichtung</option>
+        <option value="antishake" {{#if (eq settings.photo.exposureMode "antishake")}}selected{{/if}}>Anti-Verwacklung</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.exposureMode}}</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">Messmethode (-mm)</label>
+      <select name="photo.meteringMode" class="browser-default">
+        <option value="average" {{#if (eq settings.photo.meteringMode "average")}}selected{{/if}}>Durchschnitt</option>
+        <option value="spot" {{#if (eq settings.photo.meteringMode "spot")}}selected{{/if}}>Punkt</option>
+        <option value="backlit" {{#if (eq settings.photo.meteringMode "backlit")}}selected{{/if}}>Gegenlicht</option>
+        <option value="matrix" {{#if (eq settings.photo.meteringMode "matrix")}}selected{{/if}}>Matrix</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.meteringMode}}</span>
+    </div>
+
+    <div class="input-field col s12 m6">
+      <label class="active">Belichtungskorrektur (-ev, -10 bis 10)</label>
+      <input type="number" name="photo.ev" min="-10" max="10" step="1" value="{{settings.photo.ev}}">
+      <span class="helper-text">Empfehlung: {{recommended.photo.ev}}</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="input-field col s12 m4">
+      <label class="active">Weißabgleich (-awb)</label>
+      <select name="photo.awbMode" class="browser-default">
+        <option value="auto" {{#if (eq settings.photo.awbMode "auto")}}selected{{/if}}>Automatisch</option>
+        <option value="off" {{#if (eq settings.photo.awbMode "off")}}selected{{/if}}>Aus (feste Werte)</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.photo.awbMode}}</span>
+    </div>
+
+    <div class="input-field col s12 m4">
+      <label class="active">Weißabgleich Rot-Gain</label>
+      <input type="number" name="photo.awbRedGain" min="0" max="8" step="0.1" value="{{settings.photo.awbRedGain}}">
+      <span class="helper-text">Nur bei "Aus" relevant. Empfehlung: {{recommended.photo.awbRedGain}}</span>
+    </div>
+
+    <div class="input-field col s12 m4">
+      <label class="active">Weißabgleich Blau-Gain</label>
+      <input type="number" name="photo.awbBlueGain" min="0" max="8" step="0.1" value="{{settings.photo.awbBlueGain}}">
+      <span class="helper-text">Nur bei "Aus" relevant. Empfehlung: {{recommended.photo.awbBlueGain}}</span>
+    </div>
+  </div>
+
+  <h5>Video</h5>
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">Auflösung</label>
+      <select name="video.resolution" class="browser-default">
+        <option value="640x480" {{#if (eq settings.video.resolution "640x480")}}selected{{/if}}>640 x 480</option>
+        <option value="1024x768" {{#if (eq settings.video.resolution "1024x768")}}selected{{/if}}>1024 x 768</option>
+        <option value="1280x720" {{#if (eq settings.video.resolution "1280x720")}}selected{{/if}}>1280 x 720 (HD)</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.video.resolution}}</span>
+    </div>
+
+    <div class="input-field col s12 m6">
+      <label class="active">Aufnahmedauer (ms)</label>
+      <input type="number" name="video.duration" min="1000" max="60000" step="1000" value="{{settings.video.duration}}">
+      <span class="helper-text">Empfehlung: {{recommended.video.duration}}</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">Bildrate (fps)</label>
+      <input type="number" name="video.fps" min="1" max="60" step="1" value="{{settings.video.fps}}">
+      <span class="helper-text">Empfehlung: {{recommended.video.fps}}</span>
+    </div>
+
+    <div class="input-field col s12 m6">
+      <label class="active">Bitrate (bit/s, 0 = Standard)</label>
+      <input type="number" name="video.bitrate" min="0" step="100000" value="{{settings.video.bitrate}}">
+      <span class="helper-text">Empfehlung: {{recommended.video.bitrate}}</span>
+    </div>
+  </div>
+
+  <h5>Verarbeitung</h5>
+  <div class="row">
+    <div class="input-field col s12 m6">
+      <label class="active">h264 zu mp4 Konvertierung</label>
+      <select name="conversion.mode" class="browser-default">
+        <option value="copy" {{#if (eq settings.conversion.mode "copy")}}selected{{/if}}>Schnell (ohne Neukodierung)</option>
+        <option value="reencode" {{#if (eq settings.conversion.mode "reencode")}}selected{{/if}}>Neukodierung (langsamer, mehr Kompatibilität)</option>
+      </select>
+      <span class="helper-text">Empfehlung: {{recommended.conversion.mode}} (auf dem Pi Zero deutlich schneller)</span>
+    </div>
+  </div>
+
+  <button class="btn waves-effect waves-light" type="submit">Speichern</button>
+</form>
+
+<script type="application/json" id="recommended-settings">{{{json recommended}}}</script>
+<script type="application/json" id="default-settings">{{{json defaults}}}</script>
+<script>
+  (function() {
+    const form = document.querySelector('form[action="/Einstellungen"]')
+
+    const applyValues = (values, prefix) => {
+      Object.keys(values).forEach((key) => {
+        const value = values[key]
+        const name = prefix ? `${prefix}.${key}` : key
+        if (typeof value === 'object' && value !== null) {
+          applyValues(value, name)
+          return
+        }
+        const field = form.elements[name]
+        if (field) field.value = value
+      })
+    }
+
+    document.getElementById('btn-recommended').addEventListener('click', () => {
+      applyValues(JSON.parse(document.getElementById('recommended-settings').textContent), '')
+    })
+
+    document.getElementById('btn-defaults').addEventListener('click', () => {
+      applyValues(JSON.parse(document.getElementById('default-settings').textContent), '')
+    })
+  })()
+</script>

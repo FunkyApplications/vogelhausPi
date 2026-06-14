@@ -1,8 +1,18 @@
 const fs = require('fs')
 const path = require('path')
-const { exec, execFile } = require('child_process')
+const { execFile } = require('child_process')
 const ffmpeg = require('fluent-ffmpeg')
 const packageJson = require('../package.json');
+const {
+  DEFAULTS: SETTINGS_DEFAULTS,
+  RECOMMENDED: SETTINGS_RECOMMENDED,
+  IMAGE_EXTENSIONS,
+  loadSettings,
+  saveSettings,
+  buildRaspistillArgs,
+  buildRaspividArgs,
+  getConversionOutputOptions,
+} = require('../config/settings')
 
 // Performance: Cache für Dateisystem-Operationen
 let galleryCache = null
@@ -65,7 +75,7 @@ processMain = (app) => {
     }
     
     const ext = path.extname(filename).slice(1).toLowerCase()
-    if (ext !== 'png' && ext !== 'mp4') {
+    if (!IMAGE_EXTENSIONS.includes(ext) && ext !== 'mp4') {
       appendLog(`[gallery] thumbnail skipped (unsupported ext): ${filename}`)
       return callback(null, false)
     }
@@ -105,12 +115,12 @@ processMain = (app) => {
         const filepath = path.join('data', file)
         const stats = fs.statSync(filepath)
         const ext = path.extname(file).slice(1).toLowerCase()
-        const type = ext === 'png' ? 'image' : ext === 'mp4' || ext === 'h264' ? 'video' : 'other'
+        const type = IMAGE_EXTENSIONS.includes(ext) ? 'image' : ext === 'mp4' || ext === 'h264' ? 'video' : 'other'
         const thumbFile = path.join('.thumbnails', `${file}.thumb.jpg`)
         const hasThumbnail = fs.existsSync(path.join(__dirname, '..', 'data', thumbFile))
 
         // Thumbnail asynchron generieren
-        if (!hasThumbnail && (ext === 'png' || ext === 'mp4')) {
+        if (!hasThumbnail && (IMAGE_EXTENSIONS.includes(ext) || ext === 'mp4')) {
           generateThumbnail(file, () => {})
         }
 
@@ -143,7 +153,7 @@ processMain = (app) => {
         .filter(f => !f.startsWith('.'))
         .filter(f => {
           const ext = path.extname(f).slice(1).toLowerCase()
-          return ext === 'png' || ext === 'mp4'
+          return IMAGE_EXTENSIONS.includes(ext) || ext === 'mp4'
         })
         .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
       appendLog(`[gallery] rebuilding gallery list, found ${names.length} files`)
@@ -161,8 +171,8 @@ processMain = (app) => {
     
     for (const name of names) {
       const ext = path.extname(name).slice(1).toLowerCase()
-      if (ext === 'png' || ext === 'mp4') {
-        return { name, ext }
+      if (IMAGE_EXTENSIONS.includes(ext) || ext === 'mp4') {
+        return { name, ext, isImage: IMAGE_EXTENSIONS.includes(ext) }
       }
     }
     return null
@@ -175,37 +185,36 @@ processMain = (app) => {
   })
 
   app.get('/takePicture', function(req, res) {
+    const settings = loadSettings()
     const d = new Date()
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-    const command = `raspistill -o ~/Projects/vogelhausPi/data/${todayDate}_${time}.png -e png -w 1024 -h 768 -ISO 800`
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.log(`error: ${error.message}`);
-        return;
-      }
-      if (stderr) {
-        console.log(`stderr: ${stderr}`);
-        return;
-      }
-      console.log(`stdout: ${stdout}`);
+    const outputFile = path.join(__dirname, '..', 'data', `${todayDate}_${time}.${settings.photo.format}`)
+    const raspistillArgs = buildRaspistillArgs(settings, outputFile)
+
+    execFile('raspistill', raspistillArgs, (error, stdout, stderr) => {
+      if (error) appendLog(`[photo] raspistill error: ${error.message}`)
+      if (stdout) appendLog(`[photo] raspistill stdout: ${stdout}`)
+      if (stderr) appendLog(`[photo] raspistill stderr: ${stderr}`)
+      galleryCache = null
       res.redirect("/")
     });
   })
 
   app.get('/takeVideo', function(req, res) {
 
-    res.redirect("/") // Sofort zurück, Videoaufnahme läuft im Hintergrund weiter 
-    
+    res.redirect("/") // Sofort zurück, Videoaufnahme läuft im Hintergrund weiter
+
+    const settings = loadSettings()
     const d = new Date()
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
     const h264File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.h264`)
     const mp4File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.mp4`)
-    
+
     // Record as h264
-    const raspividArgs = ['-o', h264File, '-t', '10000', '-w', '640', '-h', '480']
-    
+    const raspividArgs = buildRaspividArgs(settings, h264File)
+
     execFile('raspivid', raspividArgs, (error, stdout, stderr) => {
       if (error) appendLog(`[video] raspivid error: ${error.message}`)
       if (stdout) appendLog(`[video] raspivid stdout: ${stdout}`)
@@ -221,7 +230,7 @@ processMain = (app) => {
       ffmpeg(h264File)
         .inputFormat('h264') // raspivid liefert rohen H.264-Stream ohne Container
         .output(mp4File)
-        .outputOptions(['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac'])
+        .outputOptions(getConversionOutputOptions(settings))
         .on('stderr', (line) => appendLog(`[video] ffmpeg: ${line}`))
         .on('end', () => {
           appendLog(`[video] conversion complete: ${mp4File}`)
@@ -242,6 +251,44 @@ processMain = (app) => {
         })
         .run();
     });
+  })
+
+  app.get('/Einstellungen', function(req, res) {
+    res.render('Einstellungen', {
+      settings: loadSettings(),
+      recommended: SETTINGS_RECOMMENDED,
+      defaults: SETTINGS_DEFAULTS,
+      saved: req.query.gespeichert === '1',
+    })
+  })
+
+  app.post('/Einstellungen', function(req, res) {
+    const body = req.body || {}
+    const settings = {
+      photo: {
+        resolution: body['photo.resolution'],
+        format: body['photo.format'],
+        iso: Number(body['photo.iso']),
+        exposureMode: body['photo.exposureMode'],
+        meteringMode: body['photo.meteringMode'],
+        awbMode: body['photo.awbMode'],
+        awbRedGain: Number(body['photo.awbRedGain']),
+        awbBlueGain: Number(body['photo.awbBlueGain']),
+        ev: Number(body['photo.ev']),
+      },
+      video: {
+        resolution: body['video.resolution'],
+        duration: Number(body['video.duration']),
+        fps: Number(body['video.fps']),
+        bitrate: Number(body['video.bitrate']),
+      },
+      conversion: {
+        mode: body['conversion.mode'],
+      },
+    }
+    saveSettings(settings)
+    appendLog(`[settings] gespeichert: ${JSON.stringify(settings)}`)
+    res.redirect('/Einstellungen?gespeichert=1')
   })
 
   app.get('/Galerie', function(req, res) {
@@ -280,15 +327,15 @@ processMain = (app) => {
     }
 
     const ext = path.extname(target).slice(1).toLowerCase()
-    if (ext !== 'png') {
+    if (!IMAGE_EXTENSIONS.includes(ext)) {
       return res.status(404).send('Nur Bilddateien können angezeigt werden.')
     }
 
     const stats = fs.statSync(filepath)
-    
+
     // Find previous and next images in sorted list
     const names = getCachedGalleryItems()
-    const imageNames = names.filter(f => path.extname(f).slice(1).toLowerCase() === 'png')
+    const imageNames = names.filter(f => IMAGE_EXTENSIONS.includes(path.extname(f).slice(1).toLowerCase()))
     const currentIndex = imageNames.indexOf(target)
     const previousImage = currentIndex > 0 ? imageNames[currentIndex - 1] : null
     const nextImage = currentIndex >= 0 && currentIndex < imageNames.length - 1 ? imageNames[currentIndex + 1] : null

@@ -6,7 +6,7 @@
         <div class="card" style="width: fit-content; max-width: 90%;">
           <div class="card-content center">
             <span class="card-title">Letztes Bild/Video</span>
-            {{#if (eq latestMedia.ext "png")}}
+            {{#if latestMedia.isImage}}
               <img src="/data/{{latestMedia.name}}" alt="Latest" style="max-width: 100%; max-height: 400px; border-radius: 4px;">
             {{else}}
               <video style="max-width: 100%; max-height: 400px; border-radius: 4px;" controls>
