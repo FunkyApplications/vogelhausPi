@@ -1,6 +1,8 @@
 const fs = require('fs')
 const path = require('path')
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
+const ffmpegPath = require('ffmpeg-static');
+const packageJson = require('../package.json');
 
 const humanFileSize = function(bytes) {
   if (bytes === 0) return '0 B'
@@ -21,6 +23,12 @@ const prettifyDate = function(timestamp) {
 
 processMain = (app) => {
   const galleryPageSize = 20
+
+  // Middleware to inject version into all views
+  app.use((req, res, next) => {
+    res.locals.version = packageJson.version
+    next()
+  })
 
   const buildGalleryItems = (filesRaw) => {
     return (filesRaw || [])
@@ -71,17 +79,30 @@ processMain = (app) => {
     const d = new Date()
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
-    const outputFile = path.join(__dirname, '..', 'data', `${todayDate}_${time}.h264`)
-    const command = `raspivid -o ${outputFile} -t 10000 -w 640 -h 480`
-    exec(command, (error, stdout, stderr) => {
+    const h264File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.h264`)
+    const mp4File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.mp4`)
+    
+    // Record as h264
+    const raspividArgs = ['-o', h264File, '-t', '10000', '-w', '640', '-h', '480']
+    
+    execFile('raspivid', raspividArgs, (error) => {
       if (error) {
-        console.log(`error: ${error.message}`);
+        console.log(`error recording: ${error.message}`);
+        return res.redirect("/")
       }
-      if (stderr) {
-        console.log(`stderr: ${stderr}`);
-      }
-      console.log(`stdout: ${stdout}`);
-      res.redirect("/")
+      
+      // Convert h264 to MP4 for browser compatibility
+      const ffmpegArgs = ['-i', h264File, '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', '-y', mp4File]
+      execFile(ffmpegPath, ffmpegArgs, (error) => {
+        if (error) {
+          console.log(`error converting: ${error.message}`);
+        }
+        // Clean up h264 file
+        fs.unlink(h264File, (err) => {
+          if (err) console.log(`error deleting h264: ${err}`);
+        });
+        res.redirect("/")
+      });
     });
   })
 
