@@ -21,6 +21,18 @@ const humanFileSize = function(bytes) {
   return bytes.toFixed(1) + ' ' + units[u]
 }
 
+// Logging: write to log/gallery.log
+const logDir = path.join(__dirname, '..', 'log')
+if (!fs.existsSync(logDir)) {
+  try { fs.mkdirSync(logDir, { recursive: true }) } catch (e) { console.error('Could not create log dir', e) }
+}
+const logFile = path.join(logDir, 'gallery.log')
+const appendLog = (msg) => {
+  const line = `[${new Date().toISOString()}] ${msg}\n`
+  fs.appendFile(logFile, line, (err) => { if (err) console.error('log write error', err) })
+  console.log(msg)
+}
+
 const prettifyDate = function(timestamp) {
   return new Date(Number(timestamp)).toLocaleString()
 }
@@ -47,13 +59,18 @@ processMain = (app) => {
     
     // Thumbnail existiert bereits
     if (fs.existsSync(thumbFile)) {
+      appendLog(`[gallery] thumbnail exists: ${thumbFile}`)
       return callback(null, true)
     }
     
     const ext = path.extname(filename).slice(1).toLowerCase()
-    if (ext !== 'png' && ext !== 'mp4') return callback(null, false)
+    if (ext !== 'png' && ext !== 'mp4') {
+      appendLog(`[gallery] thumbnail skipped (unsupported ext): ${filename}`)
+      return callback(null, false)
+    }
     
     // Generiere Thumbnail mit ffmpeg
+    appendLog(`[gallery] generating thumbnail for ${filename}`)
     ffmpeg(sourceFile)
       .screenshot({
         timestamps: [0],
@@ -61,8 +78,14 @@ processMain = (app) => {
         folder: thumbDir,
         size: '120x90'
       })
-      .on('end', () => callback(null, true))
-      .on('error', () => callback(null, false))
+      .on('end', () => {
+        appendLog(`[gallery] thumbnail generated: ${thumbFile}`)
+        callback(null, true)
+      })
+      .on('error', (err) => {
+        appendLog(`[gallery] thumbnail error for ${filename}: ${err && err.message ? err.message : err}`)
+        callback(null, false)
+      })
   }
 
   const buildGalleryItems = (filesRaw) => {
@@ -99,6 +122,7 @@ processMain = (app) => {
   const getCachedGalleryItems = () => {
     const now = Date.now()
     if (galleryCache && (now - cacheTimestamp) < CACHE_TTL) {
+      appendLog(`[gallery] returning cached list (${galleryCache.length} items)`)
       return galleryCache
     }
     
@@ -107,6 +131,7 @@ processMain = (app) => {
     if (fs.existsSync(dataDir)) {
       const filesRaw = fs.readdirSync(dataDir)
         .filter(f => !f.startsWith('.'))
+      appendLog(`[gallery] rebuilding gallery list, found ${filesRaw.length} files`)
       files = buildGalleryItems(filesRaw)
     }
     
@@ -183,6 +208,7 @@ processMain = (app) => {
     res.locals.galleryCount = files.length
     res.locals.maxGalleryItems = galleryPageSize
 
+    appendLog(`[gallery] GET /Galerie serving ${res.locals.files.length}/${res.locals.galleryCount}`)
     res.render('Galerie')
   })
 
@@ -190,6 +216,7 @@ processMain = (app) => {
     const files = getCachedGalleryItems()
     const offset = parseInt(req.query.offset, 10) || 0
     const nextItems = files.slice(offset, offset + galleryPageSize)
+    appendLog(`[gallery] GET /Galerie/load offset=${offset} next=${nextItems.length} total=${files.length}`)
     res.json({
       files: nextItems,
       hasMore: offset + galleryPageSize < files.length,
