@@ -1,6 +1,6 @@
 {
   "name": "vogelhauspi",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Webfrontend für Vogelhaus mit Raspberry Pi und Kamera",
   "main": "app.js",
   "scripts": {
