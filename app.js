@@ -79,11 +79,11 @@ app.use(function(req, res, next) {
   if (files && files.length) {
 
     files.forEach((file, i) => {
-      const fileType = file.split('.').pop()
+      const fileType = file.split('.').pop().toLowerCase()
       if (fileType == 'png') {
         res.locals.pictures.push(file)
       }
-      if (fileType == 'h264') {
+      if (fileType == 'mp4' || fileType == 'h264') {
         res.locals.videos.push(file)
       }
     });

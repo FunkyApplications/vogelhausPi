@@ -208,10 +208,14 @@ processMain = (app) => {
         })
         .on('error', (err) => {
           console.log(`error converting: ${err.message}`);
-          // Delete invalid MP4 if conversion fails
+          // Delete invalid MP4 and h264 if conversion fails
           fs.unlink(mp4File, (errUnlink) => {
             if (errUnlink) console.log(`error deleting invalid mp4: ${errUnlink}`);
             else console.log(`deleted invalid mp4: ${mp4File}`);
+          });
+          fs.unlink(h264File, (errUnlink) => {
+            if (errUnlink) console.log(`error deleting h264: ${errUnlink}`);
+            else console.log(`deleted h264 after failed conversion: ${h264File}`);
           });
           res.redirect("/")
         })
