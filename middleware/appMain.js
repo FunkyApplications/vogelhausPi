@@ -130,6 +130,10 @@ processMain = (app) => {
     if (fs.existsSync(dataDir)) {
       names = fs.readdirSync(dataDir)
         .filter(f => !f.startsWith('.'))
+        .filter(f => {
+          const ext = path.extname(f).slice(1).toLowerCase()
+          return ext === 'png' || ext === 'mp4'
+        })
         .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
       appendLog(`[gallery] rebuilding gallery list, found ${names.length} files`)
     }
