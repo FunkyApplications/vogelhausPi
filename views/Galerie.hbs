@@ -5,7 +5,6 @@
 <table id="gallery-table">
 <tr>
   <th style="text-align: center; vertical-align: middle;">#</th>
-  <th style="text-align: center; vertical-align: middle;">Name</th>
   <th style="text-align: center; vertical-align: middle;">Vorschau</th>
   <th style="text-align: center; vertical-align: middle;">Größe</th>
   <th style="text-align: center; vertical-align: middle;">Datum</th>
@@ -59,10 +58,10 @@
     let loading = false
     let hasMore = {{#if moreFiles}}true{{else}}false{{/if}}
 
-    const renderRow = (file) => {
+    const renderRow = (file, index) => {
       const tr = document.createElement('tr')
       tr.innerHTML = `
-        <td style="text-align: center; vertical-align: middle;">${offset + 1}</td>
+        <td style="text-align: center; vertical-align: middle;">${offset + index + 1}</td>
         <td style="text-align: center; vertical-align: middle;">
           ${file.isImage ?
             `<a href="/image/${file.name}"><img src="/data/${file.name}" alt="${file.name}" width="120" loading="lazy"></a>` :
@@ -89,8 +88,8 @@
     }
 
     const appendFiles = (items) => {
-      items.forEach(item => {
-        const row = renderRow(item)
+      items.forEach((item, index) => {
+        const row = renderRow(item, index)
         table.appendChild(row)
       })
     }
