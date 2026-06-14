@@ -85,6 +85,17 @@ processMain = (app) => {
       })
       .on('error', (err) => {
         appendLog(`[gallery] thumbnail error for ${filename}: ${err && err.message ? err.message : err}`)
+        // Defekte (z.B. 0 Byte) Mediendateien aufräumen, damit sie nicht immer wieder fehlschlagen
+        if (ext === 'mp4' && fs.existsSync(sourceFile) && fs.statSync(sourceFile).size === 0) {
+          fs.unlink(sourceFile, (unlinkErr) => {
+            if (unlinkErr) {
+              appendLog(`[gallery] could not delete broken file ${filename}: ${unlinkErr}`)
+            } else {
+              appendLog(`[gallery] deleted broken (0 byte) file ${filename}`)
+              galleryCache = null // Liste neu aufbauen, da Datei nicht mehr existiert
+            }
+          })
+        }
         callback(null, false)
       })
   }
@@ -195,36 +206,39 @@ processMain = (app) => {
     // Record as h264
     const raspividArgs = ['-o', h264File, '-t', '10000', '-w', '640', '-h', '480']
     
-    execFile('raspivid', raspividArgs, (error) => {
-      if (error) {
-        console.log(`error recording: ${error.message}`);
-        //return res.redirect("/")
+    execFile('raspivid', raspividArgs, (error, stdout, stderr) => {
+      if (error) appendLog(`[video] raspivid error: ${error.message}`)
+      if (stdout) appendLog(`[video] raspivid stdout: ${stdout}`)
+      if (stderr) appendLog(`[video] raspivid stderr: ${stderr}`)
+
+      if (!fs.existsSync(h264File) || fs.statSync(h264File).size === 0) {
+        appendLog(`[video] h264 file missing or empty, skipping conversion: ${h264File}`)
+        fs.unlink(h264File, () => {})
+        return
       }
-      
+
       // Convert h264 to MP4 for browser compatibility
       ffmpeg(h264File)
+        .inputFormat('h264') // raspivid liefert rohen H.264-Stream ohne Container
         .output(mp4File)
         .outputOptions(['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac'])
+        .on('stderr', (line) => appendLog(`[video] ffmpeg: ${line}`))
         .on('end', () => {
-          console.log('Video conversion complete');
-          // Clean up h264 file
-          //fs.unlink(h264File, (err) => {
-          //  if (err) console.log(`error deleting h264: ${err}`);
-          //});
-          //res.redirect("/")
+          appendLog(`[video] conversion complete: ${mp4File}`)
+          galleryCache = null
+          fs.unlink(h264File, (err) => {
+            if (err) appendLog(`[video] error deleting h264: ${err}`)
+          })
         })
         .on('error', (err) => {
-          console.log(`error converting: ${err.message}`);
-          // Delete invalid MP4 and h264 if conversion fails
-          //fs.unlink(mp4File, (errUnlink) => {
-          //  if (errUnlink) console.log(`error deleting invalid mp4: ${errUnlink}`);
-          //  else console.log(`deleted invalid mp4: ${mp4File}`);
-          //});
-          //fs.unlink(h264File, (errUnlink) => {
-          //  if (errUnlink) console.log(`error deleting h264: ${errUnlink}`);
-          //  else console.log(`deleted h264 after failed conversion: ${h264File}`);
-          //});
-          //res.redirect("/")
+          appendLog(`[video] error converting: ${err.message}`)
+          fs.unlink(mp4File, (errUnlink) => {
+            if (!errUnlink) appendLog(`[video] deleted invalid mp4: ${mp4File}`)
+          })
+          fs.unlink(h264File, (errUnlink) => {
+            if (errUnlink) appendLog(`[video] error deleting h264: ${errUnlink}`)
+            else appendLog(`[video] deleted h264 after failed conversion: ${h264File}`)
+          })
         })
         .run();
     });
