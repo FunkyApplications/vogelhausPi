@@ -1,7 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const { execFile } = require("child_process");
-const ffmpegPath = require('ffmpeg-static');
+const ffmpeg = require('fluent-ffmpeg')
 const packageJson = require('../package.json');
 
 const humanFileSize = function(bytes) {
@@ -83,6 +82,7 @@ processMain = (app) => {
     const mp4File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.mp4`)
     
     // Record as h264
+    const { execFile } = require('child_process')
     const raspividArgs = ['-o', h264File, '-t', '10000', '-w', '640', '-h', '480']
     
     execFile('raspivid', raspividArgs, (error) => {
@@ -92,17 +92,22 @@ processMain = (app) => {
       }
       
       // Convert h264 to MP4 for browser compatibility
-      const ffmpegArgs = ['-i', h264File, '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', '-y', mp4File]
-      execFile(ffmpegPath, ffmpegArgs, (error) => {
-        if (error) {
-          console.log(`error converting: ${error.message}`);
-        }
-        // Clean up h264 file
-        fs.unlink(h264File, (err) => {
-          if (err) console.log(`error deleting h264: ${err}`);
-        });
-        res.redirect("/")
-      });
+      ffmpeg(h264File)
+        .output(mp4File)
+        .outputOptions(['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac'])
+        .on('end', () => {
+          console.log('Video conversion complete');
+          // Clean up h264 file
+          fs.unlink(h264File, (err) => {
+            if (err) console.log(`error deleting h264: ${err}`);
+          });
+          res.redirect("/")
+        })
+        .on('error', (err) => {
+          console.log(`error converting: ${err.message}`);
+          res.redirect("/")
+        })
+        .run();
     });
   })
 
