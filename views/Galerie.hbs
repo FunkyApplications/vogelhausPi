@@ -18,11 +18,12 @@
 <td style="text-align: center; vertical-align: middle;">
   {{#if isImage}}
     <a href="/image/{{name}}">
-      <img src="/data/{{name}}" alt="{{name}}" width="120" loading="lazy">
+      <img src="{{#if thumbnail}}{{thumbnail}}{{else}}/data/{{name}}{{/if}}" alt="{{name}}" width="120" loading="lazy">
     </a>
   {{else}}
     {{#if isVideo}}
       <a href="/data/{{name}}" target="_blank">
+        {{#if thumbnail}}<img src="{{thumbnail}}" alt="{{name}}" width="120" loading="lazy">{{/if}}
         <i class="fas fa-video fa-2x"></i>
       </a>
     {{else}}
@@ -64,8 +65,8 @@
         <td style="text-align: center; vertical-align: middle;">${offset + index + 1}</td>
         <td style="text-align: center; vertical-align: middle;">
           ${file.isImage ?
-            `<a href="/image/${file.name}"><img src="/data/${file.name}" alt="${file.name}" width="120" loading="lazy"></a>` :
-            file.isVideo ? `<a href="/data/${file.name}" target="_blank"><i class="fas fa-video fa-2x"></i></a>` :
+            `<a href="/image/${file.name}"><img src="${file.thumbnail || '/data/' + file.name}" alt="${file.name}" width="120" loading="lazy"></a>` :
+            file.isVideo ? `<a href="/data/${file.name}" target="_blank"><img src="${file.thumbnail || ''}" alt="${file.name}" width="120" ${file.thumbnail ? 'loading="lazy"' : 'style="display:none"'}><i class="fas fa-video fa-2x"></i></a>` :
             `<span>${file.name}</span>`
           }
         </td>

@@ -3,6 +3,11 @@ const path = require('path')
 const ffmpeg = require('fluent-ffmpeg')
 const packageJson = require('../package.json');
 
+// Performance: Cache für Dateisystem-Operationen
+let galleryCache = null
+let cacheTimestamp = 0
+const CACHE_TTL = 5000 // 5 Sekunden
+
 const humanFileSize = function(bytes) {
   if (bytes === 0) return '0 B'
   const thresh = 1024
@@ -29,6 +34,37 @@ processMain = (app) => {
     next()
   })
 
+  // Performance: Erstelle Thumbnail-Verzeichnis falls nicht vorhanden
+  const thumbDir = path.join(__dirname, '..', 'data', '.thumbnails')
+  if (!fs.existsSync(thumbDir)) {
+    fs.mkdirSync(thumbDir, { recursive: true })
+  }
+
+  // Performance: Generiere Thumbnail für ein Bild
+  const generateThumbnail = (filename, callback) => {
+    const sourceFile = path.join(__dirname, '..', 'data', filename)
+    const thumbFile = path.join(thumbDir, `${filename}.thumb.jpg`)
+    
+    // Thumbnail existiert bereits
+    if (fs.existsSync(thumbFile)) {
+      return callback(null, true)
+    }
+    
+    const ext = path.extname(filename).slice(1).toLowerCase()
+    if (ext !== 'png' && ext !== 'mp4') return callback(null, false)
+    
+    // Generiere Thumbnail mit ffmpeg
+    ffmpeg(sourceFile)
+      .screenshot({
+        timestamps: [0],
+        filename: `${filename}.thumb.jpg`,
+        folder: thumbDir,
+        size: '120x90'
+      })
+      .on('end', () => callback(null, true))
+      .on('error', () => callback(null, false))
+  }
+
   const buildGalleryItems = (filesRaw) => {
     return (filesRaw || [])
       .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
@@ -36,7 +72,14 @@ processMain = (app) => {
         const filepath = path.join('data', file)
         const stats = fs.statSync(filepath)
         const ext = path.extname(file).slice(1).toLowerCase()
-        const type = ext === 'png' ? 'image' : ext === 'h264' ? 'video' : 'other'
+        const type = ext === 'png' ? 'image' : ext === 'mp4' || ext === 'h264' ? 'video' : 'other'
+        const thumbFile = path.join('.thumbnails', `${file}.thumb.jpg`)
+        const hasThumbnail = fs.existsSync(path.join(__dirname, '..', 'data', thumbFile))
+
+        // Thumbnail asynchron generieren
+        if (!hasThumbnail && (ext === 'png' || ext === 'mp4')) {
+          generateThumbnail(file, () => {})
+        }
 
         return {
           name: file,
@@ -47,8 +90,29 @@ processMain = (app) => {
           mtime: stats.mtimeMs,
           sizeText: humanFileSize(stats.size),
           dateText: prettifyDate(stats.mtimeMs),
+          thumbnail: hasThumbnail ? `/data/${thumbFile}` : null,
         }
       })
+  }
+
+  // Performance: Cached Gallery List
+  const getCachedGalleryItems = () => {
+    const now = Date.now()
+    if (galleryCache && (now - cacheTimestamp) < CACHE_TTL) {
+      return galleryCache
+    }
+    
+    let files = []
+    const dataDir = path.join(__dirname, '..', 'data')
+    if (fs.existsSync(dataDir)) {
+      const filesRaw = fs.readdirSync(dataDir)
+        .filter(f => !f.startsWith('.'))
+      files = buildGalleryItems(filesRaw)
+    }
+    
+    galleryCache = files
+    cacheTimestamp = now
+    return files
   }
 
   app.get('/', function(req, res) {
@@ -112,12 +176,7 @@ processMain = (app) => {
   })
 
   app.get('/Galerie', function(req, res) {
-    let files = []
-    const dataDir = path.join(__dirname, '..', 'data')
-    if (fs.existsSync(dataDir)) {
-      const filesRaw = fs.readdirSync(dataDir)
-      files = buildGalleryItems(filesRaw)
-    }
+    const files = getCachedGalleryItems()
 
     res.locals.files = files.slice(0, galleryPageSize)
     res.locals.moreFiles = files.length > galleryPageSize
@@ -128,12 +187,7 @@ processMain = (app) => {
   })
 
   app.get('/Galerie/load', function(req, res) {
-    let files = []
-    const dataDir = path.join(__dirname, '..', 'data')
-    if (fs.existsSync(dataDir)) {
-      const filesRaw = fs.readdirSync(dataDir)
-      files = buildGalleryItems(filesRaw)
-    }
+    const files = getCachedGalleryItems()
     const offset = parseInt(req.query.offset, 10) || 0
     const nextItems = files.slice(offset, offset + galleryPageSize)
     res.json({
