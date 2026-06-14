@@ -264,11 +264,21 @@ processMain = (app) => {
     }
 
     const stats = fs.statSync(filepath)
+    
+    // Find previous and next images in sorted list
+    const names = getCachedGalleryItems()
+    const imageNames = names.filter(f => path.extname(f).slice(1).toLowerCase() === 'png')
+    const currentIndex = imageNames.indexOf(target)
+    const previousImage = currentIndex > 0 ? imageNames[currentIndex - 1] : null
+    const nextImage = currentIndex >= 0 && currentIndex < imageNames.length - 1 ? imageNames[currentIndex + 1] : null
+    
     res.render('Image', {
       file: target,
       size: stats.size,
       mtime: stats.mtimeMs,
       type: 'Bild',
+      previousImage: previousImage,
+      nextImage: nextImage,
     })
   })
 
