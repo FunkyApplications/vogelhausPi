@@ -89,9 +89,7 @@ processMain = (app) => {
   }
 
   const buildGalleryItems = (filesRaw) => {
-    return (filesRaw || [])
-      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
-      .map((file) => {
+    return (filesRaw || []).map((file) => {
         const filepath = path.join('data', file)
         const stats = fs.statSync(filepath)
         const ext = path.extname(file).slice(1).toLowerCase()
@@ -126,18 +124,18 @@ processMain = (app) => {
       return galleryCache
     }
     
-    let files = []
+    let names = []
     const dataDir = path.join(__dirname, '..', 'data')
     if (fs.existsSync(dataDir)) {
-      const filesRaw = fs.readdirSync(dataDir)
+      names = fs.readdirSync(dataDir)
         .filter(f => !f.startsWith('.'))
-      appendLog(`[gallery] rebuilding gallery list, found ${filesRaw.length} files`)
-      files = buildGalleryItems(filesRaw)
+        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }))
+      appendLog(`[gallery] rebuilding gallery list, found ${names.length} files`)
     }
-    
-    galleryCache = files
+
+    galleryCache = names
     cacheTimestamp = now
-    return files
+    return names
   }
 
   app.get('/', function(req, res) {
@@ -201,11 +199,13 @@ processMain = (app) => {
   })
 
   app.get('/Galerie', function(req, res) {
-    const files = getCachedGalleryItems()
+    const names = getCachedGalleryItems()
+    const slice = names.slice(0, galleryPageSize)
+    const files = buildGalleryItems(slice)
 
-    res.locals.files = files.slice(0, galleryPageSize)
-    res.locals.moreFiles = files.length > galleryPageSize
-    res.locals.galleryCount = files.length
+    res.locals.files = files
+    res.locals.moreFiles = names.length > galleryPageSize
+    res.locals.galleryCount = names.length
     res.locals.maxGalleryItems = galleryPageSize
 
     appendLog(`[gallery] GET /Galerie serving ${res.locals.files.length}/${res.locals.galleryCount}`)
@@ -213,13 +213,14 @@ processMain = (app) => {
   })
 
   app.get('/Galerie/load', function(req, res) {
-    const files = getCachedGalleryItems()
+    const names = getCachedGalleryItems()
     const offset = parseInt(req.query.offset, 10) || 0
-    const nextItems = files.slice(offset, offset + galleryPageSize)
-    appendLog(`[gallery] GET /Galerie/load offset=${offset} next=${nextItems.length} total=${files.length}`)
+    const slice = names.slice(offset, offset + galleryPageSize)
+    const nextItems = buildGalleryItems(slice)
+    appendLog(`[gallery] GET /Galerie/load offset=${offset} next=${nextItems.length} total=${names.length}`)
     res.json({
       files: nextItems,
-      hasMore: offset + galleryPageSize < files.length,
+      hasMore: offset + galleryPageSize < names.length,
       nextOffset: offset + nextItems.length,
     })
   })
