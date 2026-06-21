@@ -5,8 +5,22 @@
 <div class="card-panel green lighten-4">Einstellungen wurden gespeichert.</div>
 {{/if}}
 
-<div class="row" style="margin-bottom: 0;">
-  <button id="btn-recommended" class="btn waves-effect waves-light" type="button">Empfohlene Werte übernehmen</button>
+<div class="card-panel {{#if (eq cameraBackend "none")}}red lighten-4{{else}}blue lighten-5{{/if}}" style="margin-bottom: 1rem;">
+  {{#if (eq cameraBackend "libcamera")}}
+    <b>Kamera-Backend:</b> libcamera (<code>libcamera-still</code> / <code>libcamera-vid</code>)
+  {{else if (eq cameraBackend "legacy")}}
+    <b>Kamera-Backend:</b> Legacy (<code>raspistill</code> / <code>raspivid</code>)
+  {{else}}
+    <b>Kein Kamera-Backend gefunden.</b> Weder <code>libcamera-still</code> noch <code>raspistill</code> sind im PATH verfügbar.
+  {{/if}}
+</div>
+
+<div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+  <select id="camera-selector" class="browser-default" style="width: auto; min-width: 220px;">
+    <option value="imx219">NoIR Camera v2 (IMX219, 8MP)</option>
+    <option value="ov5647">Camera v1 (OV5647, 5MP)</option>
+  </select>
+  <button id="btn-recommended" class="btn waves-effect waves-light" type="button">Empfehlung übernehmen</button>
   <button id="btn-defaults" class="btn-flat waves-effect" type="button">Auf Standard zurücksetzen</button>
 </div>
 
@@ -18,9 +32,11 @@
       <label class="active">Auflösung</label>
       <select name="photo.resolution" class="browser-default">
         <option value="1024x768" {{#if (eq settings.photo.resolution "1024x768")}}selected{{/if}}>1024 x 768</option>
-        <option value="1640x1232" {{#if (eq settings.photo.resolution "1640x1232")}}selected{{/if}}>1640 x 1232</option>
-        <option value="2592x1944" {{#if (eq settings.photo.resolution "2592x1944")}}selected{{/if}}>2592 x 1944</option>
-        <option value="3280x2464" {{#if (eq settings.photo.resolution "3280x2464")}}selected{{/if}}>3280 x 2464 (volle Auflösung)</option>
+        <option value="1296x972" {{#if (eq settings.photo.resolution "1296x972")}}selected{{/if}}>1296 x 972 (OV5647 nativ)</option>
+        <option value="1640x1232" {{#if (eq settings.photo.resolution "1640x1232")}}selected{{/if}}>1640 x 1232 (IMX219 nativ)</option>
+        <option value="1920x1080" {{#if (eq settings.photo.resolution "1920x1080")}}selected{{/if}}>1920 x 1080 (HD, beschnitten)</option>
+        <option value="2592x1944" {{#if (eq settings.photo.resolution "2592x1944")}}selected{{/if}}>2592 x 1944 (OV5647 voll)</option>
+        <option value="3280x2464" {{#if (eq settings.photo.resolution "3280x2464")}}selected{{/if}}>3280 x 2464 (IMX219 voll)</option>
       </select>
       <span class="helper-text">Empfehlung: {{recommended.photo.resolution}}</span>
     </div>
@@ -112,6 +128,8 @@
         <option value="640x480" {{#if (eq settings.video.resolution "640x480")}}selected{{/if}}>640 x 480</option>
         <option value="1024x768" {{#if (eq settings.video.resolution "1024x768")}}selected{{/if}}>1024 x 768</option>
         <option value="1280x720" {{#if (eq settings.video.resolution "1280x720")}}selected{{/if}}>1280 x 720 (HD)</option>
+        <option value="1296x972" {{#if (eq settings.video.resolution "1296x972")}}selected{{/if}}>1296 x 972 (OV5647 nativ)</option>
+        <option value="1920x1080" {{#if (eq settings.video.resolution "1920x1080")}}selected{{/if}}>1920 x 1080 (HD, beschnitten)</option>
       </select>
       <span class="helper-text">Empfehlung: {{recommended.video.resolution}}</span>
     </div>
@@ -152,7 +170,8 @@
   <button class="btn waves-effect waves-light" type="submit">Speichern</button>
 </form>
 
-<script type="application/json" id="recommended-settings">{{{json recommended}}}</script>
+<script type="application/json" id="recommended-imx219">{{{json recommended}}}</script>
+<script type="application/json" id="recommended-ov5647">{{{json recommendedOv5647}}}</script>
 <script type="application/json" id="default-settings">{{{json defaults}}}</script>
 <script>
   (function() {
@@ -171,8 +190,14 @@
       })
     }
 
+    const recommendedByCamera = {
+      imx219: JSON.parse(document.getElementById('recommended-imx219').textContent),
+      ov5647: JSON.parse(document.getElementById('recommended-ov5647').textContent),
+    }
+
     document.getElementById('btn-recommended').addEventListener('click', () => {
-      applyValues(JSON.parse(document.getElementById('recommended-settings').textContent), '')
+      const cam = document.getElementById('camera-selector').value
+      applyValues(recommendedByCamera[cam], '')
     })
 
     document.getElementById('btn-defaults').addEventListener('click', () => {

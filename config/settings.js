@@ -1,9 +1,9 @@
 const fs = require('fs')
 const path = require('path')
+const { execSync } = require('child_process')
 
 const settingsFile = path.join(__dirname, 'settings.json')
 
-// Bilddatei-Endungen, die von raspistill erzeugt werden können (abhängig von photo.format)
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg']
 
 // Entspricht dem bisherigen, fest codierten Verhalten
@@ -30,7 +30,7 @@ const DEFAULTS = {
   },
 }
 
-// Empfehlungen für NoIR Camera v2 an einem Raspberry Pi Zero WH (Vogelhaus)
+// Empfehlungen für NoIR Camera v2 / IMX219 (legacy raspistill oder libcamera)
 const RECOMMENDED = {
   photo: {
     resolution: '1640x1232',
@@ -53,6 +53,59 @@ const RECOMMENDED = {
     mode: 'copy',
   },
 }
+
+// Empfehlungen für Original Camera v1 / OV5647 (libcamera auf neuerem Pi)
+const RECOMMENDED_OV5647 = {
+  photo: {
+    resolution: '1296x972',
+    format: 'jpg',
+    iso: 0,
+    exposureMode: 'sports',
+    meteringMode: 'average',
+    awbMode: 'auto',
+    awbRedGain: 1.0,
+    awbBlueGain: 1.0,
+    ev: 0,
+  },
+  video: {
+    resolution: '1296x972',
+    duration: 10000,
+    fps: 30,
+    bitrate: 1500000,
+  },
+  conversion: {
+    mode: 'copy',
+  },
+}
+
+// ── Kamera-Backend-Erkennung ─────────────────────────────────────────────────
+
+let detectedBackend = null // 'libcamera' | 'legacy' | 'none'
+
+const detectCameraBackend = () => {
+  try {
+    execSync('which libcamera-still', { stdio: 'ignore' })
+    detectedBackend = 'libcamera'
+  } catch (_) {
+    try {
+      execSync('which raspistill', { stdio: 'ignore' })
+      detectedBackend = 'legacy'
+    } catch (_) {
+      detectedBackend = 'none'
+    }
+  }
+  console.log(`[camera] Backend erkannt: ${detectedBackend}`)
+  return detectedBackend
+}
+
+// Einmalig beim Laden des Moduls ausführen
+detectCameraBackend()
+
+const getCameraBackend = () => detectedBackend
+const getStillCmd = () => detectedBackend === 'libcamera' ? 'libcamera-still' : 'raspistill'
+const getVidCmd   = () => detectedBackend === 'libcamera' ? 'libcamera-vid'   : 'raspivid'
+
+// ── Settings-Persistenz ──────────────────────────────────────────────────────
 
 let cache = null
 
@@ -94,36 +147,67 @@ const parseResolution = (resolution) => {
   return { width, height }
 }
 
-// Baut die Argumente für `execFile('raspistill', args, ...)`
-const buildRaspistillArgs = (settings, outputPath) => {
+// ── Argument-Builder ─────────────────────────────────────────────────────────
+
+const buildStillArgs = (settings, outputPath) => {
   const { photo } = settings
   const { width, height } = parseResolution(photo.resolution)
-  const args = ['-o', outputPath, '-e', photo.format, '-w', String(width), '-h', String(height)]
 
+  if (detectedBackend === 'libcamera') {
+    const args = [
+      '-o', outputPath,
+      '--width', String(width),
+      '--height', String(height),
+      '--encoding', photo.format,
+    ]
+    // ISO → analoger Gain (ISO 100 ≈ Gain 1.0)
+    if (photo.iso > 0) args.push('--gain', String(photo.iso / 100))
+    if (photo.exposureMode && photo.exposureMode !== 'auto') {
+      // libcamera-still: 'sport' statt 'sports'
+      args.push('--exposure', photo.exposureMode === 'sports' ? 'sport' : photo.exposureMode)
+    }
+    if (photo.meteringMode && photo.meteringMode !== 'average') {
+      // libcamera-still: 'partial' statt 'backlit'
+      const mm = photo.meteringMode === 'backlit' ? 'partial' : photo.meteringMode
+      args.push('--metering', mm)
+    }
+    if (photo.ev) args.push('--ev', String(photo.ev))
+    if (photo.awbMode === 'off') args.push('--awbgains', `${photo.awbRedGain},${photo.awbBlueGain}`)
+    return args
+  }
+
+  // legacy (raspistill)
+  const args = ['-o', outputPath, '-e', photo.format, '-w', String(width), '-h', String(height)]
   if (photo.iso > 0) args.push('-ISO', String(photo.iso))
   if (photo.exposureMode && photo.exposureMode !== 'auto') args.push('-ex', photo.exposureMode)
   if (photo.meteringMode && photo.meteringMode !== 'average') args.push('-mm', photo.meteringMode)
   if (photo.ev) args.push('-ev', String(photo.ev))
-
-  if (photo.awbMode === 'off') {
-    args.push('-awb', 'off', '-awbg', `${photo.awbRedGain},${photo.awbBlueGain}`)
-  }
-
+  if (photo.awbMode === 'off') args.push('-awb', 'off', '-awbg', `${photo.awbRedGain},${photo.awbBlueGain}`)
   return args
 }
 
-// Baut die Argumente für `execFile('raspivid', args, ...)`
-const buildRaspividArgs = (settings, outputPath) => {
+const buildVidArgs = (settings, outputPath) => {
   const { video } = settings
   const { width, height } = parseResolution(video.resolution)
+
+  if (detectedBackend === 'libcamera') {
+    const args = [
+      '-o', outputPath,
+      '-t', String(video.duration),
+      '--width', String(width),
+      '--height', String(height),
+      '--framerate', String(video.fps),
+    ]
+    if (video.bitrate > 0) args.push('--bitrate', String(video.bitrate))
+    return args
+  }
+
+  // legacy (raspivid)
   const args = ['-o', outputPath, '-t', String(video.duration), '-w', String(width), '-h', String(height), '-fps', String(video.fps)]
-
   if (video.bitrate > 0) args.push('-b', String(video.bitrate))
-
   return args
 }
 
-// Baut die fluent-ffmpeg outputOptions für die h264 -> mp4 Konvertierung
 const getConversionOutputOptions = (settings) => {
   if (settings.conversion.mode === 'copy') {
     return ['-r', String(settings.video.fps), '-c:v', 'copy']
@@ -134,10 +218,15 @@ const getConversionOutputOptions = (settings) => {
 module.exports = {
   DEFAULTS,
   RECOMMENDED,
+  RECOMMENDED_OV5647,
   IMAGE_EXTENSIONS,
+  detectCameraBackend,
+  getCameraBackend,
+  getStillCmd,
+  getVidCmd,
   loadSettings,
   saveSettings,
-  buildRaspistillArgs,
-  buildRaspividArgs,
+  buildStillArgs,
+  buildVidArgs,
   getConversionOutputOptions,
 }

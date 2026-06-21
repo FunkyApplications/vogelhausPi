@@ -11,7 +11,7 @@ var bodyParser = require('body-parser');
 const uuid = require('uuid').v1;
 var CronJob = require('cron').CronJob;
 const { execFile } = require("child_process");
-const { loadSettings, buildRaspistillArgs, IMAGE_EXTENSIONS } = require('./config/settings');
+const { getCameraBackend, getStillCmd, loadSettings, buildStillArgs, IMAGE_EXTENSIONS } = require('./config/settings');
 
 var app = express();
 app.use(cookieParser())
@@ -102,9 +102,9 @@ const dailyPicCron = new CronJob('0 11 * * *', function(req, res, next) {
   var todayDate = d.toISOString().slice(0, 10);
   const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
   const outputFile = path.join(__dirname, 'data', `${todayDate}_${time}.${settings.photo.format}`)
-  const raspistillArgs = buildRaspistillArgs(settings, outputFile)
+  const stillArgs = buildStillArgs(settings, outputFile)
   console.log(`Foto am ${todayDate}_${time} automatisch erstellt`);
-  execFile('raspistill', raspistillArgs, (error, stdout, stderr) => {
+  execFile(getStillCmd(), stillArgs, (error, stdout, stderr) => {
     if (error) {
       console.log(`error: ${error.message}`);
       return;

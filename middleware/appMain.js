@@ -6,11 +6,15 @@ const packageJson = require('../package.json');
 const {
   DEFAULTS: SETTINGS_DEFAULTS,
   RECOMMENDED: SETTINGS_RECOMMENDED,
+  RECOMMENDED_OV5647: SETTINGS_RECOMMENDED_OV5647,
   IMAGE_EXTENSIONS,
+  getCameraBackend,
+  getStillCmd,
+  getVidCmd,
   loadSettings,
   saveSettings,
-  buildRaspistillArgs,
-  buildRaspividArgs,
+  buildStillArgs,
+  buildVidArgs,
   getConversionOutputOptions,
 } = require('../config/settings')
 
@@ -190,9 +194,9 @@ processMain = (app) => {
     var todayDate = d.toISOString().slice(0, 10);
     const time = d.toTimeString().split(' ')[0].replace(':', '').replace(':', '');
     const outputFile = path.join(__dirname, '..', 'data', `${todayDate}_${time}.${settings.photo.format}`)
-    const raspistillArgs = buildRaspistillArgs(settings, outputFile)
+    const stillArgs = buildStillArgs(settings, outputFile)
 
-    execFile('raspistill', raspistillArgs, (error, stdout, stderr) => {
+    execFile(getStillCmd(), stillArgs, (error, stdout, stderr) => {
       if (error) appendLog(`[photo] raspistill error: ${error.message}`)
       if (stdout) appendLog(`[photo] raspistill stdout: ${stdout}`)
       if (stderr) appendLog(`[photo] raspistill stderr: ${stderr}`)
@@ -213,9 +217,9 @@ processMain = (app) => {
     const mp4File = path.join(__dirname, '..', 'data', `${todayDate}_${time}.mp4`)
 
     // Record as h264
-    const raspividArgs = buildRaspividArgs(settings, h264File)
+    const vidArgs = buildVidArgs(settings, h264File)
 
-    execFile('raspivid', raspividArgs, (error, stdout, stderr) => {
+    execFile(getVidCmd(), vidArgs, (error, stdout, stderr) => {
       if (error) appendLog(`[video] raspivid error: ${error.message}`)
       if (stdout) appendLog(`[video] raspivid stdout: ${stdout}`)
       if (stderr) appendLog(`[video] raspivid stderr: ${stderr}`)
@@ -257,8 +261,10 @@ processMain = (app) => {
     res.render('Einstellungen', {
       settings: loadSettings(),
       recommended: SETTINGS_RECOMMENDED,
+      recommendedOv5647: SETTINGS_RECOMMENDED_OV5647,
       defaults: SETTINGS_DEFAULTS,
       saved: req.query.gespeichert === '1',
+      cameraBackend: getCameraBackend(),
     })
   })
 
