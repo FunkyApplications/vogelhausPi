@@ -80,21 +80,24 @@ const RECOMMENDED_OV5647 = {
 
 // ── Kamera-Backend-Erkennung ─────────────────────────────────────────────────
 
-let detectedBackend = null // 'libcamera' | 'legacy' | 'none'
+let detectedBackend = null // 'rpicam' | 'libcamera' | 'legacy' | 'none'
 
 const detectCameraBackend = () => {
-  try {
-    execSync('which libcamera-still', { stdio: 'ignore' })
-    detectedBackend = 'libcamera'
-  } catch (_) {
+  const checks = [
+    { cmd: 'rpicam-still',    result: 'rpicam'    }, // Raspberry Pi OS Bookworm+
+    { cmd: 'libcamera-still', result: 'libcamera' }, // Bullseye mit libcamera-apps
+    { cmd: 'raspistill',      result: 'legacy'    }, // älteres Pi OS
+  ]
+  for (const { cmd, result } of checks) {
     try {
-      execSync('which raspistill', { stdio: 'ignore' })
-      detectedBackend = 'legacy'
-    } catch (_) {
-      detectedBackend = 'none'
-    }
+      execSync(`which ${cmd}`, { stdio: 'ignore' })
+      detectedBackend = result
+      console.log(`[camera] Backend erkannt: ${detectedBackend} (${cmd})`)
+      return detectedBackend
+    } catch (_) {}
   }
-  console.log(`[camera] Backend erkannt: ${detectedBackend}`)
+  detectedBackend = 'none'
+  console.warn('[camera] Kein Kamera-Backend gefunden (rpicam-still/libcamera-still/raspistill).')
   return detectedBackend
 }
 
@@ -102,8 +105,18 @@ const detectCameraBackend = () => {
 detectCameraBackend()
 
 const getCameraBackend = () => detectedBackend
-const getStillCmd = () => detectedBackend === 'libcamera' ? 'libcamera-still' : 'raspistill'
-const getVidCmd   = () => detectedBackend === 'libcamera' ? 'libcamera-vid'   : 'raspivid'
+
+const getStillCmd = () => {
+  if (detectedBackend === 'rpicam')    return 'rpicam-still'
+  if (detectedBackend === 'libcamera') return 'libcamera-still'
+  return 'raspistill'
+}
+
+const getVidCmd = () => {
+  if (detectedBackend === 'rpicam')    return 'rpicam-vid'
+  if (detectedBackend === 'libcamera') return 'libcamera-vid'
+  return 'raspivid'
+}
 
 // ── Settings-Persistenz ──────────────────────────────────────────────────────
 
@@ -153,7 +166,7 @@ const buildStillArgs = (settings, outputPath) => {
   const { photo } = settings
   const { width, height } = parseResolution(photo.resolution)
 
-  if (detectedBackend === 'libcamera') {
+  if (detectedBackend === 'libcamera' || detectedBackend === 'rpicam') {
     const args = [
       '-o', outputPath,
       '--width', String(width),
@@ -190,7 +203,7 @@ const buildVidArgs = (settings, outputPath) => {
   const { video } = settings
   const { width, height } = parseResolution(video.resolution)
 
-  if (detectedBackend === 'libcamera') {
+  if (detectedBackend === 'libcamera' || detectedBackend === 'rpicam') {
     const args = [
       '-o', outputPath,
       '-t', String(video.duration),

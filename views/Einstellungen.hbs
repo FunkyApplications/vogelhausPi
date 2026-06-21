@@ -6,12 +6,14 @@
 {{/if}}
 
 <div class="card-panel {{#if (eq cameraBackend "none")}}red lighten-4{{else}}blue lighten-5{{/if}}" style="margin-bottom: 1rem;">
-  {{#if (eq cameraBackend "libcamera")}}
-    <b>Kamera-Backend:</b> libcamera (<code>libcamera-still</code> / <code>libcamera-vid</code>)
+  {{#if (eq cameraBackend "rpicam")}}
+    <b>Kamera-Backend:</b> rpicam-apps (<code>rpicam-still</code> / <code>rpicam-vid</code>) — Raspberry Pi OS Bookworm+
+  {{else if (eq cameraBackend "libcamera")}}
+    <b>Kamera-Backend:</b> libcamera-apps (<code>libcamera-still</code> / <code>libcamera-vid</code>) — Bullseye
   {{else if (eq cameraBackend "legacy")}}
     <b>Kamera-Backend:</b> Legacy (<code>raspistill</code> / <code>raspivid</code>)
   {{else}}
-    <b>Kein Kamera-Backend gefunden.</b> Weder <code>libcamera-still</code> noch <code>raspistill</code> sind im PATH verfügbar.
+    <b>Kein Kamera-Backend gefunden.</b> Weder <code>rpicam-still</code>, <code>libcamera-still</code> noch <code>raspistill</code> sind im PATH verfügbar.
   {{/if}}
 </div>
 
