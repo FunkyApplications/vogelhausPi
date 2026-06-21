@@ -180,8 +180,10 @@ const buildStillArgs = (settings, outputPath) => {
       args.push('--exposure', photo.exposureMode === 'sports' ? 'sport' : photo.exposureMode)
     }
     if (photo.meteringMode && photo.meteringMode !== 'average') {
-      // libcamera-still: 'partial' statt 'backlit'
-      const mm = photo.meteringMode === 'backlit' ? 'partial' : photo.meteringMode
+      // rpicam/libcamera metering modes: centre | spot | average | custom
+      const mm = photo.meteringMode === 'backlit' ? 'centre'
+               : photo.meteringMode === 'matrix'  ? 'average'
+               : photo.meteringMode
       args.push('--metering', mm)
     }
     if (photo.ev) args.push('--ev', String(photo.ev))

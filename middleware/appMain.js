@@ -196,10 +196,11 @@ processMain = (app) => {
     const outputFile = path.join(__dirname, '..', 'data', `${todayDate}_${time}.${settings.photo.format}`)
     const stillArgs = buildStillArgs(settings, outputFile)
 
-    execFile(getStillCmd(), stillArgs, (error, stdout, stderr) => {
-      if (error) appendLog(`[photo] raspistill error: ${error.message}`)
-      if (stdout) appendLog(`[photo] raspistill stdout: ${stdout}`)
-      if (stderr) appendLog(`[photo] raspistill stderr: ${stderr}`)
+    const stillCmd = getStillCmd()
+    execFile(stillCmd, stillArgs, (error, stdout, stderr) => {
+      if (error) appendLog(`[photo] ${stillCmd} error: ${error.message}`)
+      if (stdout) appendLog(`[photo] ${stillCmd} stdout: ${stdout}`)
+      if (stderr) appendLog(`[photo] ${stillCmd} stderr: ${stderr}`)
       galleryCache = null
       res.redirect("/")
     });
@@ -219,10 +220,11 @@ processMain = (app) => {
     // Record as h264
     const vidArgs = buildVidArgs(settings, h264File)
 
-    execFile(getVidCmd(), vidArgs, (error, stdout, stderr) => {
-      if (error) appendLog(`[video] raspivid error: ${error.message}`)
-      if (stdout) appendLog(`[video] raspivid stdout: ${stdout}`)
-      if (stderr) appendLog(`[video] raspivid stderr: ${stderr}`)
+    const vidCmd = getVidCmd()
+    execFile(vidCmd, vidArgs, (error, stdout, stderr) => {
+      if (error) appendLog(`[video] ${vidCmd} error: ${error.message}`)
+      if (stdout) appendLog(`[video] ${vidCmd} stdout: ${stdout}`)
+      if (stderr) appendLog(`[video] ${vidCmd} stderr: ${stderr}`)
 
       if (!fs.existsSync(h264File) || fs.statSync(h264File).size === 0) {
         appendLog(`[video] h264 file missing or empty, skipping conversion: ${h264File}`)
